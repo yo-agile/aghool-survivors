@@ -3,10 +3,14 @@ name = "survivors-lobby"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Co-op matchmaking server for Warcraft Survivors: public/private lobbies, join codes, ready-up, and match handoff. Carries no game data and no player credentials, so unlike wenilla-host it's meant to run on the open internet."
+description = "Co-op matchmaking + web-save server for Warcraft Survivors: public/private lobbies, join codes, ready-up, match handoff, and the web build's character-progress saves (the desktop build saves to its own machine instead). Carries no game data and no player credentials by default, so unlike wenilla-host it's meant to run on the open internet."
 
 [lints]
 workspace = true
+
+[lib]
+name = "survivors_lobby"
+path = "src/lib.rs"
 
 [[bin]]
 name = "survivors-lobby"
@@ -18,7 +22,7 @@ survivors-lobby-protocol = { path = "../survivors-lobby-protocol" }
 anyhow.workspace = true
 clap.workspace = true
 axum = { version = "0.8", features = ["ws"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "fs"] }
 # Splits `axum::extract::ws::WebSocket` into independent read/write halves, same reason
 # wenilla-host takes it: the send side (broadcast → socket) and the recv side (socket →
 # handler) run as two concurrent tasks.
