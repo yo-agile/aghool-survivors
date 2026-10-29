@@ -6541,6 +6541,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "survivors-lobby"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "clap",
+ "futures-util",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "survivors-lobby-protocol",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "survivors-lobby-protocol"
+version = "0.2.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "svg_fmt"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
