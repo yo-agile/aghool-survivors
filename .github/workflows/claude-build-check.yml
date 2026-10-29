@@ -1,0 +1,86 @@
+# Compile checks for the game client, run on every push to a `claude/**` branch, with the build
+# output posted back as a comment on the commit (scripts/ci-report.sh). The sandbox the lobby and
+# co-op work is written in cannot build the Bevy client itself (no system libraries, no wasm
+# toolchain), so this is how a change to it is compiled and its errors read.
+#
+# Separate from check.yml on purpose: that one is upstream's PR gate and stays as it is.
+name: claude-build-check
+on:
+  push:
+    branches: ['claude/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: claude-build-check-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: native
+      - name: native Bevy dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq pkg-config libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+      - name: cargo check, native client
+        id: check
+        run: |
+          set -o pipefail
+          cargo check -p benilla-app -p warcraft-survivors 2>&1 | tee "$RUNNER_TEMP/native-check.log"
+      - name: lobby crates, tests
+        id: lobby
+        if: always()
+        run: |
+          set -o pipefail
+          cargo test -p survivors-lobby-protocol -p survivors-lobby 2>&1 | tee "$RUNNER_TEMP/lobby-test.log"
+      - name: web save sync, tests
+        id: savesync
+        if: always()
+        run: |
+          set -o pipefail
+          node --test web/tests/savesync.test.mjs 2>&1 | tee "$RUNNER_TEMP/savesync.log"
+      - name: report to the commit
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          scripts/ci-report.sh native \
+            "cargo check (native client)|${{ steps.check.outcome }}|$RUNNER_TEMP/native-check.log" \
+            "lobby crates tests|${{ steps.lobby.outcome }}|$RUNNER_TEMP/lobby-test.log" \
+            "web save sync tests|${{ steps.savesync.outcome }}|$RUNNER_TEMP/savesync.log"
+  wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm
+          cache-directories: tools
+      - name: toolchain (scripts/web-setup.sh)
+        run: scripts/web-setup.sh
+      - name: cargo check, wasm32
+        id: check
+        run: |
+          set -o pipefail
+          cargo check --target wasm32-unknown-unknown -p wenilla --no-default-features --features webgpu 2>&1 | tee "$RUNNER_TEMP/wasm-check.log"
+      - name: report to the commit
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          scripts/ci-report.sh wasm \
+            "cargo check (wasm32, browser build)|${{ steps.check.outcome }}|$RUNNER_TEMP/wasm-check.log"
