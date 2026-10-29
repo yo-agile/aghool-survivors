@@ -99,6 +99,22 @@
       })
       .catch((e) => console.warn('bridge.js:', e));
   }
-  const w = await boot(init);
+  // VPS-backed saves (web/savesync.js): inert unless a server is configured (`?saves=<url>` or
+  // `__wenilla_env.survivors_server`). The pull from the server overlaps the wasm download, and
+  // `init` waits for it, so the game never reads its saved state before the server's copy is in.
+  // Never load-bearing: a missing or slow server costs the game nothing but the sync.
+  const synced = import('./savesync.js')
+    .then(async ({ startSaveSync, mountSaveWidget }) => {
+      const saves = await startSaveSync();
+      if (saves) {
+        window.wenillaSaves = saves;
+        mountSaveWidget(saves);
+      }
+    })
+    .catch((e) => console.warn('savesync.js:', e));
+  const w = await boot(async (arg) => {
+    await synced;
+    return init(arg);
+  });
   bind(w.memory);
 </script>

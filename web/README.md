@@ -256,3 +256,15 @@ is built and handed over inside the frame) and push heavy work to a Worker. `'*'
 `UNIT_*` fire — subscribe by name. Not in this version: party/guild blocks, unit facing, look
 pitch, an `interact` (right-click) op, on-demand name resolution (names come from the cache;
 a unit can be `name: null` for a frame or two), and raw packet access — deliberately.
+
+## Saving progress on a server (`savesync.js`)
+
+The desktop build keeps its state in `benilla-config/` beside the exe. The browser build keeps
+the same files in `localStorage`, which lives in one browser only. `savesync.js` mirrors them to
+a `survivors-lobby` server (`GET/PUT /saves/{id}`) so a web player's progress survives cleared
+site data or a new browser, and adds **Download save** / **Import save** for the player's own copy.
+
+It does nothing unless a server is configured, either `window.__wenilla_env.survivors_server`
+or `?saves=https://lobby.example.com` on the page URL. The save id is a random UUID the browser
+mints and keeps; whoever holds it can read and replace that save (there are no accounts).
+Last write wins. Tests: `node --test web/tests/savesync.test.mjs`.
