@@ -1,0 +1,35 @@
+[package]
+name = "benilla-assets"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Bevy AssetSource + AssetLoaders over the WoW 1.12.1 MPQ patch chain"
+
+[lints]
+workspace = true
+
+[features]
+# The dev/player seam, on by default. `benilla-formats` comes in without default features and its
+# `dev` is forwarded here, or unification would put it back in a player build.
+default = ["dev"]
+dev = ["benilla-formats/dev"]
+
+[dependencies]
+anyhow.workspace = true
+bevy.workspace = true
+benilla-formats = { path = "../benilla-formats", default-features = false }
+# Nearest-neighbour resize of layer BLPs smaller than `LAYER_TEX_SIZE`: texel replication in gamma
+# bytes, with no averaging to darken mid-tones.
+image = { version = "0.25", default-features = false }
+serde = { version = "1", features = ["derive"] }
+
+# `MpqAssetReader::read` fetches over HTTP instead of reading the MPQ chain directly on the web
+# target — see `src/lib.rs`. Pinned exact per the wasm plan's global constraint: a newer
+# wasm-bindgen crate than the installed 0.2.122 CLI emits glue the CLI can't match.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "=0.2.122"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3.99"
+web-sys = { version = "0.3.99", features = ["Window", "Response", "Request"] }
+
+web-time = "1"
