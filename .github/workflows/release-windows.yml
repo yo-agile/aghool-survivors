@@ -1,0 +1,80 @@
+# Builds the native Windows game (the player build: no `dev` feature, so no debug panel and no
+# source-tree path baked in) and publishes it as a GitHub Release.
+#
+# Run it by pushing a version tag:   git tag v0.1.0 && git push origin v0.1.0
+# The release carries one zip with the exe and a short how-to-run note. It carries no Blizzard
+# content: the game reads a WoW 1.12.1 client's `Data` folder at runtime, which the player supplies.
+name: release-windows
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        # Honours rust-toolchain.toml's pinned channel.
+        run: rustup toolchain install && rustc -V
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-release
+      - name: Build the player exe
+        run: cargo build --release -p warcraft-survivors --no-default-features
+      - name: Package
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          out="aghool-survivors-${TAG}-windows-x64"
+          mkdir -p "dist/$out"
+          cp target/release/warcraft-survivors.exe "dist/$out/AzerothSurvivors.exe"
+          cat > "dist/$out/HOW-TO-RUN.txt" <<'EOF'
+          Azeroth Survivors (fan game) - Windows build
+
+          This download does NOT include any Blizzard game files. It needs the "Data" folder
+          (the .MPQ files) of a World of Warcraft 1.12.1 (build 5875) client. Either:
+
+            1. Put that Data folder next to AzerothSurvivors.exe  ->  .\Data\*.MPQ
+               (or  .\WoW\Data\*.MPQ), then double-click AzerothSurvivors.exe; or
+            2. Set the WOW_DATA environment variable to the Data folder's full path.
+
+          Your character progress is saved in a benilla-config folder beside the exe.
+          This build is single-player; co-op is not part of it yet.
+          EOF
+          (cd dist && powershell -NoProfile -Command "Compress-Archive -Path '$out' -DestinationPath '$out.zip'")
+          (cd dist && sha256sum "$out.zip" > "$out.zip.sha256")
+          ls -la dist
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          out="aghool-survivors-${TAG}-windows-x64"
+          cat > notes.md <<'EOF'
+          Windows build of Azeroth Survivors, built by GitHub Actions from this repository's source.
+
+          **Needs a WoW 1.12.1 `Data` folder** - not included (see `HOW-TO-RUN.txt` in the zip).
+          Put it next to the exe, or point `WOW_DATA` at it.
+
+          This is the single-player game. Co-op lobbies run on the `survivors-lobby` server, but
+          the in-game co-op match is not in this build yet.
+          EOF
+          gh release create "$TAG" "dist/$out.zip" "dist/$out.zip.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Azeroth Survivors $TAG (Windows)" \
+            --notes-file notes.md \
+            --verify-tag
