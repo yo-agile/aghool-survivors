@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Azeroth Survivors - Co-op Lobby</title>
+<style>
+  :root {
+    --bg: #0b0907;
+    --panel: rgba(20, 13, 10, 0.84);
+    --panel-edge: #4a3622;
+    --gold: #f2c866;
+    --gold-dim: #b8934a;
+    --text: #eadfc6;
+    --muted: #9c8c70;
+    --field: rgba(8, 5, 4, 0.7);
+    --red-1: #6b1d15;
+    --red-2: #3b0e0a;
+    --ok: #7fd08a;
+    --bad: #ff8a7a;
+    --serif: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, "Times New Roman", serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background:
+      radial-gradient(ellipse 80% 55% at 50% -5%, #34200f 0%, rgba(52, 32, 15, 0) 70%),
+      radial-gradient(ellipse 60% 50% at 85% 100%, #1d0f0b 0%, rgba(29, 15, 11, 0) 70%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.4;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: 0.5; }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  .shell { max-width: 1560px; margin: 0 auto; padding: 18px 20px 22px; }
+  header { text-align: center; padding: 6px 0 16px; }
+  h1 {
+    margin: 0; font-weight: 400; font-size: clamp(34px, 5vw, 58px);
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold);
+    text-shadow: 0 2px 0 #5a3d12, 0 0 28px rgba(242, 200, 102, 0.25);
+  }
+  h1 span { color: #ffe9b0; }
+  .sub { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+
+  .grid {
+    display: grid; gap: 22px; align-items: stretch;
+    grid-template-columns: minmax(280px, 1fr) minmax(360px, 1.15fr) minmax(280px, 1fr);
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 4px;
+    padding: 18px 20px 20px; min-height: 620px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6), 0 12px 40px rgba(0, 0, 0, 0.45);
+  }
+  h2 {
+    margin: 0 0 16px; text-align: center; font-weight: 400; font-size: 22px;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold);
+    display: flex; align-items: center; gap: 14px;
+  }
+  h2::before, h2::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--panel-edge)); }
+  h2::after { transform: scaleX(-1); }
+
+  /* Class panel */
+  .classes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 10px; justify-items: center; }
+  .cls {
+    background: none; border: 0; padding: 0; width: 100%; max-width: 110px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--muted);
+  }
+  .cls .tile {
+    width: 64px; height: 64px; border-radius: 6px; border: 2px solid #3b2d1d;
+    display: grid; place-items: center; font-size: 30px; line-height: 1;
+    background: linear-gradient(160deg, #241812, #120c09);
+    color: var(--c); text-shadow: 0 0 14px var(--c);
+    transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+  }
+  .cls:hover .tile { border-color: var(--gold-dim); transform: translateY(-1px); }
+  .cls[aria-pressed="true"] { color: var(--c); }
+  .cls[aria-pressed="true"] .tile { border-color: var(--gold); box-shadow: 0 0 0 1px #000, 0 0 18px var(--c); }
+  .cls .nm { font-size: 14px; }
+  .classinfo { margin-top: 28px; }
+  .classinfo h3 { margin: 0 0 6px; font-weight: 400; font-size: 24px; color: var(--c); }
+  .classinfo p { margin: 0; color: var(--text); opacity: 0.85; }
+
+  /* Zone panel */
+  .zones {
+    display: flex; flex-direction: column; gap: 8px; max-height: 548px; overflow-y: auto; padding-right: 8px;
+    /* A visible track, so it's clear there are more zones below the fold. */
+    scrollbar-width: thin; scrollbar-color: var(--gold-dim) rgba(255, 255, 255, 0.06);
+  }
+  .zones::-webkit-scrollbar { width: 8px; }
+  .zones::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.06); border-radius: 4px; }
+  .zones::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 4px; }
+  .zone {
+    text-align: left; background: rgba(8, 5, 4, 0.55); border: 1px solid #2f241a; border-radius: 3px;
+    padding: 10px 14px; color: var(--muted); font-size: 18px; letter-spacing: 0.02em;
+  }
+  .zone:hover:not(:disabled) { border-color: var(--gold-dim); color: var(--text); }
+  .zone[aria-pressed="true"] {
+    color: var(--gold); border: 2px solid var(--gold); padding: 9px 13px;
+    background: linear-gradient(90deg, rgba(120, 78, 20, 0.35), rgba(30, 18, 8, 0.6));
+  }
+  .zone:disabled:not([aria-pressed="true"]) { opacity: 0.35; }
+  .zone:disabled[aria-pressed="true"] { opacity: 1; cursor: default; }
+
+  /* Center panel */
+  .field { display: flex; gap: 0; }
+  .field input {
+    flex: 1; min-width: 0; background: var(--field); border: 1px solid var(--panel-edge);
+    border-radius: 3px 0 0 3px; padding: 10px 14px; font-size: 26px; color: var(--text);
+  }
+  .field button {
+    background: #2a1a10; border: 1px solid var(--panel-edge); border-left: 0; border-radius: 0 3px 3px 0;
+    padding: 0 16px; color: var(--gold);
+  }
+  .field button:hover { background: #3a2515; }
+  .playing { margin: 10px 2px 0; color: var(--muted); }
+  .playing b { font-weight: 400; color: var(--c, var(--text)); }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 22px 0 16px; border-bottom: 1px solid var(--panel-edge); }
+  .tab {
+    background: none; border: 1px solid transparent; border-bottom: 0; padding: 8px 16px;
+    color: var(--muted); border-radius: 3px 3px 0 0; margin-bottom: -1px; font-size: 17px;
+  }
+  .tab[aria-selected="true"] { color: var(--gold); background: var(--panel); border-color: var(--panel-edge); }
+  .row { display: block; margin: 0 0 14px; }
+  label.row > span, .lbl { display: block; color: var(--muted); font-size: 14px; margin-bottom: 5px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .in, select.in {
+    width: 100%; background: var(--field); border: 1px solid var(--panel-edge); border-radius: 3px;
+    padding: 9px 12px; font-size: 18px; color: var(--text);
+  }
+  select.in option { background: #1a110c; }
+  .seg { display: flex; }
+  .seg button {
+    flex: 1; background: var(--field); border: 1px solid var(--panel-edge); padding: 9px 10px; color: var(--muted); font-size: 17px;
+  }
+  .seg button:first-child { border-radius: 3px 0 0 3px; }
+  .seg button:last-child { border-radius: 0 3px 3px 0; border-left: 0; }
+  .seg button[aria-pressed="true"] { background: rgba(120, 78, 20, 0.4); color: var(--gold); border-color: var(--gold-dim); }
+  .codein { font-size: 34px; letter-spacing: 0.4em; text-align: center; text-transform: uppercase; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .hint { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .lob {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center;
+    background: rgba(8, 5, 4, 0.55); border: 1px solid #2f241a; border-radius: 3px; padding: 10px 14px;
+  }
+  .lob .t { font-size: 18px; }
+  .lob .m { color: var(--muted); font-size: 14px; }
+  .lob .n { color: var(--gold); font-size: 17px; }
+  .small {
+    background: #2a1a10; border: 1px solid var(--panel-edge); border-radius: 3px; padding: 6px 14px; color: var(--gold);
+  }
+  .small:hover:not(:disabled) { background: #3a2515; border-color: var(--gold-dim); }
+  .empty { color: var(--muted); padding: 18px 4px; }
+
+  /* Room */
+  .code {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    border: 1px solid var(--gold-dim); border-radius: 3px; padding: 12px 16px;
+    background: linear-gradient(90deg, rgba(120, 78, 20, 0.25), rgba(20, 13, 10, 0.4));
+  }
+  .code .v { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 34px; letter-spacing: 0.3em; color: var(--gold); }
+  .code .l { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .code .sp { flex: 1; }
+  .meta { display: flex; justify-content: space-between; margin: 14px 2px 10px; color: var(--muted); }
+  .meta b { color: var(--text); font-weight: 400; }
+  .roster { display: flex; flex-direction: column; gap: 8px; }
+  .pl {
+    display: grid; grid-template-columns: 22px 1fr auto auto; gap: 12px; align-items: center;
+    background: rgba(8, 5, 4, 0.55); border: 1px solid #2f241a; border-radius: 3px; padding: 10px 14px;
+  }
+  .pl.me { border-color: var(--gold-dim); }
+  .pl .crown { color: var(--gold); text-align: center; }
+  .pl .nm { font-size: 19px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pl .nm i { color: var(--muted); font-style: normal; font-size: 14px; }
+  .pl .cl { color: var(--c, var(--muted)); font-size: 16px; }
+  .pl .rd { font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); min-width: 74px; text-align: right; }
+  .pl .rd.on { color: var(--ok); }
+  .match { text-align: center; padding: 34px 10px; }
+  .match h3 { margin: 0 0 10px; font-weight: 400; font-size: 30px; color: var(--gold); }
+  .match p { margin: 8px 0; color: var(--text); opacity: 0.9; }
+  .match code { color: var(--gold); font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .note { margin-top: 16px; min-height: 24px; color: var(--bad); }
+  .note.info { color: var(--muted); }
+
+  /* Bottom bar */
+  .bar { display: flex; justify-content: center; align-items: stretch; gap: 14px; margin: 22px 0 8px; flex-wrap: wrap; }
+  .bar button {
+    background: linear-gradient(#3a0f0b, #230806); border: 1px solid #6b2a1d; border-radius: 3px;
+    padding: 10px 26px; color: var(--text); text-align: center; min-width: 150px;
+  }
+  .bar button:hover:not(:disabled) { border-color: var(--gold-dim); }
+  .bar .primary {
+    min-width: min(468px, 100%); border: 2px solid var(--gold); padding: 12px 30px;
+    background: linear-gradient(#6b1d15, #3b0e0a); box-shadow: 0 0 24px rgba(242, 80, 30, 0.2);
+  }
+  .bar .primary .t { display: block; font-size: 30px; letter-spacing: 0.05em; text-transform: uppercase; color: #ffe9b0; line-height: 1.15; }
+  .bar .primary .s { display: block; font-size: 14px; color: #d9c7a2; margin-top: 2px; }
+  .bar .side .t { display: block; font-size: 20px; }
+  .bar .side .s { display: block; font-size: 13px; color: var(--muted); }
+  .bar .ghost { visibility: hidden; }
+  .foot { text-align: center; color: var(--muted); font-size: 14px; }
+  .foot b { color: var(--text); font-weight: 400; }
+  noscript { display: block; text-align: center; padding: 40px; color: var(--bad); }
+
+  .grid > * { min-width: 0; }
+  @media (max-width: 1100px) {
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .panel { min-height: 0; }
+    .shell { padding: 12px 12px 18px; }
+    .code .v { font-size: 28px; letter-spacing: 0.2em; }
+    .codein { letter-spacing: 0.25em; }
+    .pl { grid-template-columns: 22px 1fr auto; }
+    .pl .rd { grid-column: 2 / -1; text-align: left; }
+    .zones { max-height: 320px; }
+    .bar button { flex: 1 1 100%; }
+  }
+</style>
+</head>
+<body>
+<noscript>The lobby needs JavaScript.</noscript>
+<div class="shell">
+  <header>
+    <h1>Azeroth <span>Survivors</span></h1>
+    <p class="sub">Co-op lobby &middot; make a lobby, share the code, ready up together.</p>
+  </header>
+
+  <main class="grid">
+    <section class="panel" aria-labelledby="h-class">
+      <h2 id="h-class">Class</h2>
+      <div class="classes" id="classGrid"></div>
+      <div class="classinfo" id="classInfo"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-lobby">
+      <h2 id="h-lobby">Lobby</h2>
+      <div class="field">
+        <input id="name" maxlength="24" autocomplete="off" spellcheck="false" aria-label="Your name" placeholder="Your name">
+        <button id="random" type="button">Random</button>
+      </div>
+      <div class="playing" id="playing"></div>
+
+      <div id="menuView">
+        <div class="tabs" role="tablist" id="tabs">
+          <button class="tab" role="tab" data-tab="create" type="button">Create</button>
+          <button class="tab" role="tab" data-tab="join" type="button">Join with code</button>
+          <button class="tab" role="tab" data-tab="browse" type="button">Public lobbies</button>
+        </div>
+
+        <div id="paneCreate">
+          <label class="row"><span>Lobby name</span>
+            <input class="in" id="lobbyName" maxlength="32" autocomplete="off" placeholder="My lobby">
+          </label>
+          <div class="row"><span class="lbl">Who can find it</span>
+            <div class="seg" id="vis">
+              <button type="button" data-v="public" aria-pressed="true">Public</button>
+              <button type="button" data-v="private" aria-pressed="false">Private (code only)</button>
+            </div>
+          </div>
+          <label class="row"><span>Players</span>
+            <select class="in" id="max"></select>
+          </label>
+          <label class="row"><span>Who runs the match</span>
+            <select class="in" id="host">
+              <option value="player_hosted">The host player (their game runs it)</option>
+              <option value="dedicated_server" disabled>Dedicated server (not available yet)</option>
+            </select>
+          </label>
+          <p class="hint" id="createHint"></p>
+        </div>
+
+        <div id="paneJoin" hidden>
+          <label class="row"><span>Lobby code</span>
+            <input class="in codein" id="codeIn" maxlength="6" autocomplete="off" spellcheck="false" placeholder="ABC123" inputmode="text">
+          </label>
+          <p class="hint">Six letters and numbers, from the host. Not case sensitive.</p>
+        </div>
+
+        <div id="paneBrowse" hidden>
+          <div class="list" id="lobbyList"></div>
+        </div>
+      </div>
+
+      <div id="roomView" hidden>
+        <div class="tabs" style="margin-bottom:16px"></div>
+        <div class="code">
+          <div><div class="l">Lobby code</div><div class="v" id="roomCode"></div></div>
+          <div class="sp"></div>
+          <button class="small" id="copyCode" type="button">Copy code</button>
+          <button class="small" id="copyLink" type="button">Copy invite link</button>
+        </div>
+        <div class="meta"><span id="roomName"></span><span id="roomCount"></span></div>
+        <div class="roster" id="roster"></div>
+        <p class="hint" id="roomHint"></p>
+      </div>
+
+      <div id="matchView" class="match" hidden>
+        <h3>Match starting</h3>
+        <p id="matchMsg"></p>
+        <p>Seed <code id="matchSeed"></code></p>
+        <p class="hint">The in-game co-op match isn't built yet. This is the hand-off: once it is, the game client takes over from here with this seed and token.</p>
+      </div>
+
+      <div class="note" id="note" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-zone">
+      <h2 id="h-zone">Zone</h2>
+      <div class="zones" id="zoneList"></div>
+    </section>
+  </main>
+
+  <div class="bar">
+    <button id="btnLeft" class="side" type="button"><span class="t"></span><span class="s"></span></button>
+    <button id="btnMain" class="primary" type="button"><span class="t"></span><span class="s"></span></button>
+    <button id="btnRight" class="side" type="button"><span class="t"></span><span class="s"></span></button>
+  </div>
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+'use strict';
+(() => {
+  // ---- data ---------------------------------------------------------------------------------
+  // Class names match `survivors_lobby_protocol::CLASSES`; the server accepts only these.
+  const CLASSES = [
+    { name: 'Warrior', color: '#C79C6E', glyph: '⚔', blurb: 'Front-line brawler. Soaks hits and cleaves through the swarm.' },
+    { name: 'Paladin', color: '#F58CBA', glyph: '✠', blurb: 'Holy hammers and self-healing. Hard to put down.' },
+    { name: 'Hunter',  color: '#ABD473', glyph: '➶', blurb: 'Picks enemies off at range with arrows and traps.' },
+    { name: 'Rogue',   color: '#FFF569', glyph: '†', blurb: 'Fast and fragile. Burst damage from the shadows.' },
+    { name: 'Priest',  color: '#FFFFFF', glyph: '✚', blurb: 'Shields and heals while the light does the killing.' },
+    { name: 'Shaman',  color: '#2F8BFF', glyph: 'ϟ', blurb: 'Lightning and totems. Tough for a caster.' },
+    { name: 'Mage',    color: '#69CCF0', glyph: '✶', blurb: 'Frost, fire and arcane at range. Hits hard, falls fast.' },
+    { name: 'Warlock', color: '#9482C9', glyph: '☠', blurb: 'Shadow magic and drained life, paid for in health.' },
+    { name: 'Druid',   color: '#FF7D0A', glyph: '❀', blurb: 'Shapeshifter with nature magic and staying power.' },
+  ];
+  const ZONES = [
+    'Elwynn Forest', 'Durotar', 'Teldrassil', 'Dun Morogh', 'Mulgore', 'Tirisfal Glades',
+    'Westfall', 'Duskwood', 'Redridge Mountains', 'The Barrens', 'Fire Plume Ridge',
+    'Mount Hyjal', 'Gurubashi Arena', 'The Dark Portal', "Gates of Ahn'Qiraj", 'Naxxramas',
+  ];
+  const NAMES = ['Thorin', 'Elara', 'Brannoch', 'Sylva', 'Korgan', 'Mira', 'Dunric', 'Vael', 'Ysolde', 'Garrick', 'Neris', 'Tamsin'];
+  const MIN_PLAYERS = 2, MAX_PLAYERS = 8, DEFAULT_PLAYERS = 4;
+
+  // ---- helpers ------------------------------------------------------------------------------
+  const $ = (s) => document.querySelector(s);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('survivors-lobby:' + k); return v === null ? d : v; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('survivors-lobby:' + k, v); } catch { /* private mode: the page works without it */ } },
+  };
+  // Elements are built, never parsed: everything another player can influence reaches the page
+  // through textContent.
+  function el(tag, props, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v == null) continue;
+      if (k === 'class') e.className = v;
+      else if (k === 'text') e.textContent = v;
+      else if (k === 'style') for (const [sk, sv] of Object.entries(v)) e.style.setProperty(sk, sv);
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v);
+    }
+    for (const kid of kids) if (kid != null) e.append(kid);
+    return e;
+  }
+  const classOf = (n) => CLASSES.find((c) => c.name === n);
+
+  // Where the lobby server is. Same origin by default (the server serves this page); `?server=`
+  // points a page hosted elsewhere at one. A page opened from disk falls back to the local default.
+  const params = new URLSearchParams(location.search);
+  const sameOrigin = /^https?:$/.test(location.protocol) ? location.origin : 'http://127.0.0.1:8099';
+  let httpBase = sameOrigin;
+  const asked = params.get('server');
+  if (asked && /^https?:\/\/[^\s/]+$/i.test(asked.replace(/\/+$/, ''))) httpBase = asked.replace(/\/+$/, '');
+  const wsBase = httpBase.replace(/^http/i, 'ws');
+
+  // ---- state --------------------------------------------------------------------------------
+  const S = {
+    name: store.get('name', '') || NAMES[Math.floor(Math.random() * NAMES.length)],
+    cls: CLASSES.some((c) => c.name === store.get('class', '')) ? store.get('class', '') : 'Paladin',
+    zone: ZONES.includes(store.get('zone', '')) ? store.get('zone', '') : 'Elwynn Forest',
+    tab: 'create',
+    pub: true,
+    max: DEFAULT_PLAYERS,
+    busy: false,
+    room: null,   // { ws, me, st } once the server has welcomed us
+    match: null,  // MatchStarting payload
+    lobbies: [],
+    pollTimer: null,
+  };
+
+  // ---- rendering ----------------------------------------------------------------------------
+  function notice(msg, info) {
+    const n = $('#note');
+    n.textContent = msg || '';
+    n.className = 'note' + (info ? ' info' : '');
+  }
+
+  function renderClasses() {
+    const grid = $('#classGrid');
+    grid.replaceChildren(...CLASSES.map((c) => el('button', {
+      class: 'cls', type: 'button', 'aria-pressed': String(S.cls === c.name), style: { '--c': c.color },
+      onclick: () => setClass(c.name),
+    }, el('span', { class: 'tile', text: c.glyph, 'aria-hidden': 'true' }), el('span', { class: 'nm', text: c.name }))));
+    const c = classOf(S.cls);
+    $('#classInfo').replaceChildren(el('h3', { text: c.name, style: { '--c': c.color } }), el('p', { text: c.blurb }));
+    const p = $('#playing');
+    p.style.setProperty('--c', c.color);
+    p.replaceChildren('Playing as ', el('b', { text: c.name }));
+  }
+
+  function renderZones() {
+    const locked = !!S.room;
+    const shown = locked ? S.room.st.map : S.zone;
+    const list = ZONES.includes(shown) || !locked ? ZONES : [shown, ...ZONES];
+    $('#zoneList').replaceChildren(...list.map((z) => el('button', {
+      class: 'zone', type: 'button', text: z, 'aria-pressed': String(z === shown), onclick: () => { S.zone = z; store.set('zone', z); renderZones(); renderBar(); },
+    })));
+    for (const b of $('#zoneList').children) b.disabled = locked;
+  }
+
+  function renderRoster() {
+    const st = S.room.st;
+    const roster = $('#roster');
+    roster.replaceChildren(...st.players.map((p) => {
+      const c = classOf(p.class);
+      return el('div', { class: 'pl' + (p.id === S.room.me ? ' me' : '') },
+        el('span', { class: 'crown', text: p.is_host ? '♕' : '', title: p.is_host ? 'Host' : '' }),
+        el('span', { class: 'nm', text: p.name }, p.id === S.room.me ? el('i', { text: '  (you)' }) : null),
+        el('span', { class: 'cl', text: c ? c.name : 'No class', style: c ? { '--c': c.color } : {} }),
+        el('span', { class: 'rd' + (p.ready ? ' on' : ''), text: p.ready ? 'Ready' : 'Not ready' }));
+    }));
+    $('#roomCode').textContent = st.code;
+    $('#roomName').replaceChildren(el('b', { text: st.name }), ' · ' + st.map);
+    $('#roomCount').textContent = st.players.length + ' / ' + st.max_players + ' players';
+    const ready = st.players.filter((p) => p.ready).length;
+    $('#roomHint').textContent = st.players.length < 2
+      ? 'Waiting for friends. Share the code or the invite link.'
+      : ready + ' of ' + st.players.length + ' ready.';
+  }
+
+  function me() { return S.room && S.room.st.players.find((p) => p.id === S.room.me); }
+
+  function setBtn(btn, title, sub, opts = {}) {
+    btn.querySelector('.t').textContent = title || '';
+    btn.querySelector('.s').textContent = sub || '';
+    btn.classList.toggle('ghost', !title);
+    btn.disabled = !title || !!opts.disabled;
+  }
+
+  function renderBar() {
+    const L = $('#btnLeft'), M = $('#btnMain'), R = $('#btnRight');
+    if (S.room && S.match) {
+      setBtn(L, 'Leave', 'back to the lobby menu'); setBtn(M, '', ''); setBtn(R, '', '');
+      M.classList.add('ghost');
+      return;
+    }
+    if (S.room) {
+      const mine = me(), st = S.room.st;
+      const everyone = st.players.length > 0 && st.players.every((p) => p.ready);
+      const host = mine && mine.is_host;
+      setBtn(L, 'Leave', 'close this lobby view');
+      if (!mine || !mine.ready) setBtn(M, 'Ready', 'Confirm ' + S.cls + ' in ' + st.map);
+      else if (host && everyone) setBtn(M, 'Start match', 'Everyone is ready');
+      else setBtn(M, 'Waiting…', host ? 'For the others to ready up' : 'For the host to start', { disabled: true });
+      setBtn(R, mine && mine.ready ? 'Unready' : '', 'to change something');
+      M.classList.remove('ghost');
+      return;
+    }
+    M.classList.remove('ghost');
+    setBtn(L, '', ''); setBtn(R, '', '');
+    if (S.tab === 'create') setBtn(M, 'Create lobby', S.zone + ' · ' + (S.pub ? 'public' : 'private') + ' · up to ' + S.max + ' players', { disabled: S.busy });
+    else if (S.tab === 'join') setBtn(M, 'Join lobby', 'enter the code from the host', { disabled: S.busy });
+    else setBtn(M, 'Refresh list', 'public lobbies waiting for players', { disabled: S.busy });
+  }
+
+  function renderView() {
+    const inRoom = !!S.room;
+    $('#menuView').hidden = inRoom;
+    $('#roomView').hidden = !inRoom || !!S.match;
+    $('#matchView').hidden = !S.match;
+    $('#name').disabled = inRoom;
+    if (!inRoom) {
+      for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-selected', String(t.dataset.tab === S.tab));
+      $('#paneCreate').hidden = S.tab !== 'create';
+      $('#paneJoin').hidden = S.tab !== 'join';
+      $('#paneBrowse').hidden = S.tab !== 'browse';
+      $('#createHint').textContent = 'Zone: ' + S.zone + '. Pick another on the right.';
+    } else if (!S.match) {
+      renderRoster();
+    }
+    renderZones();
+    renderBar();
+    schedulePoll();
+  }
+
+  function renderLobbies() {
+    const list = $('#lobbyList');
+    if (!S.lobbies.length) {
+      list.replaceChildren(el('div', { class: 'empty', text: 'No public lobbies right now. Create one, or join a friend with their code.' }));
+      return;
+    }
+    list.replaceChildren(...S.lobbies.map((l) => el('div', { class: 'lob' },
+      el('div', {}, el('div', { class: 't', text: l.name }), el('div', { class: 'm', text: l.map })),
+      el('div', { class: 'n', text: l.players + ' / ' + l.max_players }),
+      el('button', { class: 'small', type: 'button', text: 'Join', disabled: l.players >= l.max_players ? '' : null, onclick: () => joinRoom(l.code) }))));
+  }
+
+  // ---- actions ------------------------------------------------------------------------------
+  function setClass(name) {
+    S.cls = name; store.set('class', name);
+    if (S.room && !S.match) send({ type: 'SetClass', class: name });
+    renderClasses(); renderBar();
+  }
+
+  function send(msg) { if (S.room && S.room.ws.readyState === WebSocket.OPEN) S.room.ws.send(JSON.stringify(msg)); }
+
+  function currentName() { return $('#name').value.trim() || 'Player'; }
+
+  async function api(path, init) {
+    let res;
+    try { res = await fetch(httpBase + path, init); }
+    catch { throw new Error("Can't reach the lobby server at " + httpBase + '.'); }
+    if (!res.ok) throw new Error((await res.text().catch(() => '')) || 'The server said ' + res.status + '.');
+    return res;
+  }
+
+  async function createLobby() {
+    if (S.busy) return;
+    S.busy = true; renderBar(); notice('');
+    try {
+      const nm = $('#lobbyName').value.trim() || currentName() + "'s lobby";
+      const res = await api('/lobbies', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: nm, public: S.pub, max_players: S.max, map: S.zone, host_mode: $('#host').value }),
+      });
+      const { code } = await res.json();
+      await joinRoom(code, true);
+    } catch (e) { notice(e.message); }
+    S.busy = false; renderBar();
+  }
+
+  async function joinRoom(raw, skipPreflight) {
+    const code = String(raw || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{6}$/.test(code)) { notice('Codes are six letters and numbers.'); return; }
+    if (S.busy && !skipPreflight) return;
+    S.busy = true; renderBar(); notice('');
+    try {
+      if (!skipPreflight) await api('/lobbies/' + code);
+      await new Promise((resolve, reject) => {
+        const ws = new WebSocket(wsBase + '/ws/lobby/' + code + '?name=' + encodeURIComponent(currentName()) + '&class=' + encodeURIComponent(S.cls));
+        let welcomed = false;
+        ws.onmessage = (ev) => {
+          let m; try { m = JSON.parse(ev.data); } catch { return; }
+          if (m.type === 'Welcome') {
+            welcomed = true;
+            S.room = { ws, me: m.you, st: m.state }; S.match = null;
+            store.set('name', currentName());
+            renderView(); resolve();
+          } else if (m.type === 'State' && S.room) {
+            const { type, ...st } = m; S.room.st = st; renderView();
+          } else if (m.type === 'MatchStarting') {
+            S.match = m;
+            $('#matchSeed').textContent = String(m.seed);
+            $('#matchMsg').textContent = 'Everyone is in. The host started the run.';
+            notice(''); renderView();
+          } else if (m.type === 'Error') {
+            if (!welcomed) reject(new Error(m.message)); else notice(m.message);
+          }
+        };
+        ws.onerror = () => { if (!welcomed) reject(new Error("Couldn't open a connection to the lobby.")); };
+        ws.onclose = () => {
+          if (!welcomed) { reject(new Error("Couldn't join that lobby.")); return; }
+          if (S.room && S.room.ws === ws) { leaveRoom(); notice('Lost the connection to the lobby.'); }
+        };
+      });
+    } catch (e) { notice(e.message); }
+    S.busy = false; renderBar();
+  }
+
+  function leaveRoom() {
+    const r = S.room;
+    S.room = null; S.match = null;
+    if (r) { r.ws.onclose = null; try { r.ws.close(); } catch { /* already closed */ } }
+    notice('');
+    renderView();
+    if (S.tab === 'browse') pollLobbies();
+  }
+
+  function mainAction() {
+    if (S.room && !S.match) {
+      const mine = me();
+      if (!mine.ready) return send({ type: 'SetReady', ready: true });
+      if (mine.is_host && S.room.st.players.every((p) => p.ready)) return send({ type: 'StartMatch' });
+      return;
+    }
+    if (S.tab === 'create') return createLobby();
+    if (S.tab === 'join') return joinRoom($('#codeIn').value);
+    return pollLobbies(true);
+  }
+
+  async function pollLobbies(manual) {
+    if (S.room || S.tab !== 'browse') return;
+    try {
+      S.lobbies = await (await api('/lobbies')).json();
+      renderLobbies();
+      if (manual) notice('');
+    } catch (e) { if (manual) notice(e.message); }
+  }
+  function schedulePoll() {
+    clearInterval(S.pollTimer); S.pollTimer = null;
+    if (!S.room && S.tab === 'browse') { pollLobbies(); S.pollTimer = setInterval(() => pollLobbies(), 4000); }
+  }
+
+  async function copy(text, what) {
+    try { await navigator.clipboard.writeText(text); notice('Copied ' + what + '.', true); }
+    catch { notice('Copy failed. Select it and press Ctrl+C: ' + text, true); }
+  }
+
+  // ---- wiring -------------------------------------------------------------------------------
+  $('#name').value = S.name;
+  $('#name').addEventListener('input', () => store.set('name', $('#name').value.trim()));
+  $('#random').addEventListener('click', () => { if (!S.room) { $('#name').value = NAMES[Math.floor(Math.random() * NAMES.length)]; store.set('name', $('#name').value); } });
+  for (const t of document.querySelectorAll('.tab')) t.addEventListener('click', () => { S.tab = t.dataset.tab; notice(''); renderView(); });
+  for (const b of document.querySelectorAll('#vis button')) b.addEventListener('click', () => {
+    S.pub = b.dataset.v === 'public';
+    for (const o of document.querySelectorAll('#vis button')) o.setAttribute('aria-pressed', String(o === b));
+    renderBar();
+  });
+  const maxSel = $('#max');
+  for (let n = MIN_PLAYERS; n <= MAX_PLAYERS; n++) maxSel.append(el('option', { value: String(n), text: n + ' players' }));
+  maxSel.value = String(DEFAULT_PLAYERS);
+  maxSel.addEventListener('change', () => { S.max = Number(maxSel.value); renderBar(); });
+  $('#codeIn').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
+  $('#codeIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') mainAction(); });
+  $('#lobbyName').addEventListener('keydown', (e) => { if (e.key === 'Enter') mainAction(); });
+  $('#btnMain').addEventListener('click', mainAction);
+  $('#btnLeft').addEventListener('click', () => { if (S.room) leaveRoom(); });
+  $('#btnRight').addEventListener('click', () => { if (S.room && !S.match) send({ type: 'SetReady', ready: false }); });
+  $('#copyCode').addEventListener('click', () => S.room && copy(S.room.st.code, 'the code'));
+  $('#copyLink').addEventListener('click', () => {
+    if (!S.room) return;
+    const u = new URL(location.href); u.search = '?code=' + S.room.st.code;
+    if (asked) u.searchParams.set('server', asked);
+    copy(u.toString(), 'the invite link');
+  });
+  window.addEventListener('pagehide', () => { if (S.room) { S.room.ws.onclose = null; S.room.ws.close(); } });
+
+  // An invite link opens straight on the Join tab with the code filled in.
+  const invited = (params.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  if (invited) { S.tab = 'join'; $('#codeIn').value = invited; }
+
+  $('#foot').replaceChildren('Lobby server: ', el('b', { text: httpBase.replace(/^https?:\/\//, '') }));
+  renderClasses();
+  renderView();
+})();
+</script>
+</body>
+</html>

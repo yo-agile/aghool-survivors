@@ -6553,6 +6553,8 @@ dependencies = [
  "serde_json",
  "survivors-lobby-protocol",
  "tokio",
+ "tokio-tungstenite 0.29.0",
+ "tower",
  "tower-http",
  "tracing",
  "tracing-subscriber",

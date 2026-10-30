@@ -37,3 +37,9 @@ uuid = { version = "1", features = ["v4"] }
 # process, likely a separate (sub)domain even on the same VPS); without this, browsers refuse
 # the fetch/WebSocket entirely.
 tower-http = { version = "0.7", features = ["cors", "trace"] }
+
+[dev-dependencies]
+# The integration test drives the real router over a real socket (WebSocket framing is fiddly to
+# hand-roll) and answers REST through `ServiceExt::oneshot`, no socket needed.
+tokio-tungstenite = "0.29"
+tower = { version = "0.5", features = ["util"] }

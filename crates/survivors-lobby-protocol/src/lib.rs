@@ -11,6 +11,28 @@ use serde::{Deserialize, Serialize};
 /// servers normalize to uppercase.
 pub type LobbyCode = String;
 
+/// Fewest and most players one lobby may hold. These are the server's *admission* limits — a
+/// design cap, not a measured one: how many players a run can actually carry depends on the
+/// simulation cost of the match relay, which doesn't exist yet. Raise `MAX_PLAYERS` only after
+/// measuring that.
+pub const MIN_PLAYERS: u8 = 2;
+pub const MAX_PLAYERS: u8 = 8;
+/// What a new lobby offers by default; the lobby page preselects it.
+pub const DEFAULT_PLAYERS: u8 = 4;
+
+/// Longest display name (characters) for a player, a lobby, and a zone label. Servers trim and
+/// truncate to these rather than reject, so a long paste never strands a player at the form.
+pub const MAX_PLAYER_NAME_CHARS: usize = 24;
+pub const MAX_LOBBY_NAME_CHARS: usize = 32;
+pub const MAX_ZONE_NAME_CHARS: usize = 40;
+
+/// The nine classes a player can bring, spelled exactly as the game's class table
+/// (`benilla-app/src/survivors/data.rs`) spells them. The server accepts nothing else in
+/// `PlayerInfo::class`, so a roster never shows a string a client invented.
+pub const CLASSES: [&str; 9] = [
+    "Warrior", "Paladin", "Hunter", "Rogue", "Priest", "Shaman", "Mage", "Warlock", "Druid",
+];
+
 /// Who simulates enemies, loot and damage for a running match. The lobby and its wire protocol
 /// don't care which: both are "one seat broadcasts authoritative state, everyone else sends
 /// input," just occupied by different things.
@@ -20,6 +42,7 @@ pub enum HostMode {
     /// The lobby's host player's own client runs the simulation.
     PlayerHosted,
     /// A separate, headless process (run by the operator, not a player) runs the simulation.
+    /// Reserved: the server refuses to create such a lobby until that process exists.
     DedicatedServer,
 }
 
@@ -56,6 +79,9 @@ pub struct PlayerInfo {
     /// Unique within this lobby's lifetime; not a reusable account id.
     pub id: u32,
     pub name: String,
+    /// One of [`CLASSES`], or empty while the player hasn't picked yet.
+    #[serde(default)]
+    pub class: String,
     pub ready: bool,
     /// The first player to join is the host: they pick ready-up timing and press start. Ignored
     /// when `host_mode` is `DedicatedServer`, where no player seat is authoritative.
@@ -68,6 +94,7 @@ pub struct LobbyState {
     pub code: LobbyCode,
     pub name: String,
     pub map: String,
+    pub max_players: u8,
     pub host_mode: HostMode,
     pub players: Vec<PlayerInfo>,
 }
@@ -78,6 +105,9 @@ pub struct LobbyState {
 pub enum ClientMsg {
     /// Toggle this player's ready state.
     SetReady { ready: bool },
+    /// Change this player's class (one of [`CLASSES`]). Clears their ready state, so nobody is
+    /// counted ready for a build they've since changed.
+    SetClass { class: String },
     /// Host only, and only once everyone is ready: begin the handoff into a match.
     StartMatch,
 }

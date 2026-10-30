@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use axum::http::Method;
 use clap::Parser;
-use survivors_lobby::{rest, save, state, ws};
+use survivors_lobby::{save, state};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
@@ -47,9 +47,19 @@ async fn main() -> Result<()> {
         .allow_methods([Method::GET, Method::POST, Method::PUT])
         .allow_headers(Any);
 
-    let app = rest::router(lobby_state.clone())
-        .merge(ws::router(lobby_state))
-        .merge(save::router(save_store))
+    // A lobby created over REST that nobody ever joins has no socket whose close would clear it.
+    let sweeper = lobby_state.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            let swept = sweeper.sweep_abandoned(state::ABANDONED_AFTER).await;
+            if swept > 0 {
+                tracing::info!(swept, "dropped abandoned lobbies");
+            }
+        }
+    });
+
+    let app = survivors_lobby::router(lobby_state, save_store)
         .layer(TraceLayer::new_for_http())
         .layer(cors);
 

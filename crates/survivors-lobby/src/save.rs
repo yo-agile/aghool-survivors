@@ -47,17 +47,17 @@ fn save_path(dir: &Path, id: &str) -> Option<PathBuf> {
     Some(dir.join(format!("{id}.json")))
 }
 
-async fn get_save(
-    State(store): State<SaveStore>,
-    AxPath(id): AxPath<String>,
-) -> impl IntoResponse {
+async fn get_save(State(store): State<SaveStore>, AxPath(id): AxPath<String>) -> impl IntoResponse {
     let Some(path) = save_path(&store.dir, &id) else {
         return (StatusCode::BAD_REQUEST, "id must be a uuid").into_response();
     };
     match tokio::fs::read(&path).await {
-        Ok(bytes) => {
-            (StatusCode::OK, [(header::CONTENT_TYPE, "application/json")], bytes).into_response()
-        }
+        Ok(bytes) => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, "application/json")],
+            bytes,
+        )
+            .into_response(),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             (StatusCode::NOT_FOUND, "no save with this id yet").into_response()
         }
